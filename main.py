@@ -1,6 +1,9 @@
+import os
 import re
 import time
 import requests
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 
@@ -17,6 +20,18 @@ COOKIES = {
 }
 
 STYLE_WORDS = {"leopard", "cheetah", "tiger", "flower", "floral", "flame", "fire", "checkerboard", "grid", "rainbow"}
+
+# שרת ווב מזערי שפועל במקביל כדי לספק ל-Render את הפורט הדרוש לחשבון החינמי
+class SimpleHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"IE Deals Bot is running 24/7!")
+
+def run_dummy_server():
+    port = int(os.environ.get("PORT", 8080))
+    server = HTTPServer(("0.0.0.0", port), SimpleHandler)
+    server.serve_forever()
 
 def clean_aliexpress_url(raw_url: str) -> str:
     item_match = re.search(r"item/(\d+)\.html", raw_url)
@@ -209,9 +224,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ אנא שלח קישור תקין של מוצר מעליאקספרס.")
 
 if __name__ == "__main__":
+    # הפעלת שרת הדמה ברקע
+    server_thread = threading.Thread(target=run_dummy_server, daemon=True)
+    server_thread.start()
+    
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
-    print("Bot IE Deals running with strict color, style & model matching...")
+    print("Bot IE Deals running with web listener on Render Free...")
     app.run_polling(poll_interval=0.5, timeout=10)
